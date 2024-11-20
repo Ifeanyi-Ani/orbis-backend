@@ -1,11 +1,14 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
+  Res,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Prisma } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { Response } from 'express';
 import { DatabaseService } from 'src/database/database.service';
 
 @Injectable()
@@ -40,7 +43,10 @@ export class AuthService {
     return user;
   }
 
-  async login(email: string, password: string) {
+  async login(email: string, password: string, @Res() res: Response) {
+    if (!email || !password) {
+      throw new BadRequestException('Provide email and password');
+    }
     const user = await this.DatabaseService.user.findUnique({
       where: {
         email,
