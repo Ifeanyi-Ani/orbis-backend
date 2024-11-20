@@ -57,7 +57,24 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    return this.generateToken(user);
+    const { access_token, refresh_token } = this.generateToken(user);
+    console.log('we are here');
+
+    res.cookie('access_token', access_token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 30 * 60 * 1000,
+    });
+
+    res.cookie('refresh_token', refresh_token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    res.status(200).json({ access_token, refresh_token });
   }
 
   private generateToken(user: Prisma.UserCreateInput) {
@@ -74,6 +91,7 @@ export class AuthService {
         secret: process.env.JWT_SECRET,
         expiresIn: '30m',
       }),
+
       refresh_token: this.jwtService.sign(payload, {
         secret: process.env.JWT_REFRESH_SECRET,
         expiresIn: '7d',
