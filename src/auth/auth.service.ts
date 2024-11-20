@@ -1,11 +1,14 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
+  Res,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Prisma } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { Response } from 'express';
 import { DatabaseService } from 'src/database/database.service';
 
 @Injectable()
@@ -40,7 +43,10 @@ export class AuthService {
     return user;
   }
 
-  async login(email: string, password: string) {
+  async login(email: string, password: string, @Res() res: Response) {
+    if (!email || !password) {
+      throw new BadRequestException('Provide email and password');
+    }
     const user = await this.DatabaseService.user.findUnique({
       where: {
         email,
@@ -57,7 +63,24 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    return this.generateToken(user);
+    const { access_token, refresh_token } = this.generateToken(user);
+    console.log('we are here');
+
+    res.cookie('access_token', access_token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 30 * 60 * 1000,
+    });
+
+    res.cookie('refresh_token', refresh_token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    res.status(200).json({ access_token, refresh_token });
   }
 
   private generateToken(user: Prisma.UserCreateInput) {
@@ -74,10 +97,49 @@ export class AuthService {
         secret: process.env.JWT_SECRET,
         expiresIn: '30m',
       }),
+
       refresh_token: this.jwtService.sign(payload, {
         secret: process.env.JWT_REFRESH_SECRET,
         expiresIn: '7d',
       }),
     };
+  }
+  refreshToken(user: any, @Res() res: Response) {
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.LastName,
+      role: user.role,
+    };
+
+    const newAccessToken = this.jwtService.sign(payload, {
+      secret: process.env.JWT_SECRET,
+      expiresIn: '30m',
+    });
+
+    const newRefreshToken = this.jwtService.sign(payload, {
+      secret: process.env.JWT_REFRESH_SECRET,
+      expiresIn: '7d',
+    });
+
+    res.cookie('access_token', newAccessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 30 * 60 * 1000,
+    });
+
+    res.cookie('refresh_token', newRefreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 30 * 60 * 1000,
+    });
+
+    return res.json({
+      access_token: newAccessToken,
+      refresh_token: newRefreshToken,
+    });
   }
 }

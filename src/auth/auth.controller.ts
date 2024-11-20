@@ -1,6 +1,7 @@
-import { Body, Controller, HttpCode, Post } from '@nestjs/common';
+import { Body, Controller, HttpCode, Post, Res } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { Prisma } from '@prisma/client';
+import { Response } from 'express';
 
 @Controller('auth')
 export class AuthController {
@@ -12,7 +13,10 @@ export class AuthController {
 
   @HttpCode(200)
   @Post('login')
-  signin(@Body() { email, password }: { email: string; password: string }) {
-    return this.authService.login(email, password);
+  signin(
+    @Body() { email, password }: { email: string; password: string },
+    @Res() res: Response,
+  ) {
+    return this.authService.login(email, password, res);
   }
 }
