@@ -21,27 +21,29 @@ enum Role {
 }
 
 model User {
-  id          String       @id @default(cuid())
-  email       String       @unique
-  password    String
-  role        Role
-  type        String
-  profile     Profile?
-  permissions Permission[]
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  role      Role
+  type      String
+  firstName String
+  lastName  String
+  profile   Profile?
 }
 
 model Profile {
-  id        String @id @default(cuid())
-  userId    String @unique
-  user      User   @relation(fields: [userId], references: [id])
-  firstName String
-  lastName  String
+  id      String @id @default(cuid())
+  userId  String @unique
+  user    User   @relation(fields: [userId], references: [id])
+  bio     String
+  address String
+  country String
 }
 
-model Permission {
-  id       String   @id @default(cuid())
-  userId   String
-  user     User     @relation(fields: [userId], references: [id])
-  actions  String[]
-  resource String
-}
+// model Permission {
+//   id       String   @id @default(cuid())
+//   userId   String
+//   user     User     @relation(fields: [userId], references: [id])
+//   actions  String[]
+//   resource String
+// }
