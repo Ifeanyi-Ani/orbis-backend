@@ -15,6 +15,16 @@ export class UsersService {
       );
     }
 
+    const existingUser = await this.database.user.findUnique({
+      where: { email },
+    });
+
+    if (existingUser) {
+      throw new ConflictException('User already exists');
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 12);
+
   }
 
   }
