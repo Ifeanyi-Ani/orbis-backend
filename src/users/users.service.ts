@@ -25,6 +25,28 @@ export class UsersService {
 
     const hashedPassword = await bcrypt.hash(password, 12);
 
+    return this.database.$transaction(async (db) => {
+      const user = await db.user.create({
+        data: {
+          email,
+          password: hashedPassword,
+          firstName,
+          lastName,
+          role,
+        },
+      });
+
+      const admin = await db.admin.create({
+        data: {
+          ...additionalDetails,
+          userId: user.id,
+        },
+      });
+
+      user.password = undefined;
+
+      return { ...user, admin };
+    });
   }
 
   }
