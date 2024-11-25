@@ -1,5 +1,13 @@
-import { Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+} from '@nestjs/common';
+import { CreatePatientDto } from './dto/create-patient.dto';
+import { DatabaseService } from 'src/database/database.service';
+import { Role } from '@prisma/client';
+import { CreateAdminDto } from './dto/create-admin.dto';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class UsersService {
@@ -49,5 +57,33 @@ export class UsersService {
     });
   }
 
+  async createPatient(createPatientDto: CreatePatientDto) {
+    const { medicalHistory, insuranceInfo, dob, ...userData } =
+      createPatientDto;
+
+    const hashedPassword = await bcrypt.hash(userData.password, 12);
+
+    return this.database.$transaction(async (db) => {
+      const user = await db.user.create({
+        data: {
+          ...userData,
+          password: hashedPassword,
+          role: Role.PATIENT,
+        },
+      });
+
+      const patient = await db.patient.create({
+        data: {
+          userId: user.id,
+          dob,
+          medicalHistory,
+          insuranceInfo,
+        },
+      });
+
+      user.password = undefined;
+
+      return { ...user, patient };
+    });
   }
 }
