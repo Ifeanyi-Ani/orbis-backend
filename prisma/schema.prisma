@@ -15,13 +15,38 @@ enum Role {
   ADMIN
 }
 
+enum BloodType {
+  A_POSITIVE
+  B_POSITIVE
+  AB_POSITIVE
+  O_POSITIVE
+  A_NEGATIVE
+  B_NEGATIVE
+  AB_NEGATIVE
+  O_NEGATIVE
+}
+
+enum Gender {
+  MALE
+  FEMALE
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELED
+  MISSED
+}
+
 model User {
-  id        String @id @default(uuid())
-  email     String @unique
-  password  String
-  role      Role
-  firstName String
-  lastName  String
+  id            String   @id @default(uuid())
+  firstName     String
+  lastName      String
+  email         String   @unique
+  password      String
+  role          Role
+  contactNumber String?
+  dob           DateTime
 
   patient      Patient?
   doctor       Doctor?
@@ -33,10 +58,26 @@ model User {
   updatedAt DateTime @updatedAt
 }
 
+model Patient {
+  id               String            @id @default(uuid())
+  userId           String            @unique
+  user             User              @relation(fields: [userId], references: [id])
+  gender           Gender
+  bloodType        BloodType
+  insuranceInfo    String?
+  address          String
+  emergencyContact EmergencyContact?
+  medicalRecords   MedicalRecords[]
+  appointments     Appointments[]
+}
+
 model Admin {
-  id     String @id @default(uuid())
-  userId String @unique
-  user   User   @relation(fields: [userId], references: [id])
+  id             String  @id @default(uuid())
+  userId         String  @unique
+  user           User    @relation(fields: [userId], references: [id])
+  department     String
+  officeLocation String?
+  assignedTasks  String?
 }
 
 model Nurse {
@@ -49,21 +90,49 @@ model Nurse {
 }
 
 model Doctor {
-  id            String @id @default(uuid())
-  userId        String @unique
-  user          User   @relation(fields: [userId], references: [id])
-  specialty     String
-  licenseNumber String
-  department    String
+  id                String           @id @default(uuid())
+  userId            String           @unique
+  user              User             @relation(fields: [userId], references: [id])
+  specialty         String
+  licenseNumber     String
+  qualifications    String
+  yearsOfExperience Int
+  department        String
+  consultations     MedicalRecords[]
+  appointments      Appointments[]
 }
 
-model Patient {
-  id             String   @id @default(uuid())
-  userId         String   @unique
-  user           User     @relation(fields: [userId], references: [id])
-  dob            DateTime
-  medicalHistory String?
-  insuranceInfo  String?
+model Appointments {
+  id              String            @id @default(uuid())
+  Patient         Patient?          @relation(fields: [patientId], references: [id])
+  patientId       String?
+  appointmentDate DateTime
+  status          AppointmentStatus
+  reason          String?
+  prescription    String
+  doctorId        String
+  doctor          Doctor            @relation(fields: [doctorId], references: [id])
+}
+
+model MedicalRecords {
+  id         String   @id @default(uuid())
+  recordDate DateTime @default(now())
+  diagnosis  String
+  treatment  String
+  patientId  String?
+  doctorId   String
+  Patient    Patient? @relation(fields: [patientId], references: [id])
+  doctor     Doctor   @relation(fields: [doctorId], references: [id])
+}
+
+model EmergencyContact {
+  id            String  @id @default(uuid())
+  Patient       Patient @relation(fields: [patientId], references: [id])
+  patientId     String  @unique
+  firstName     String
+  lastName      String
+  contactNumber String
+  address       String
 }
 
 model Receptionist {
