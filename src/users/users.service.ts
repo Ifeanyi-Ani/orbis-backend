@@ -189,4 +189,26 @@ export class UsersService {
     return { message: 'Email verified successfully' };
   }
 
+  public async setPassword(token: string, newPassword: string) {
+    const tokenRecord = await this.tokenService.validateToken(
+      token,
+      'passwordSetup',
+    );
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    await this.database.$transaction([
+      this.database.user.update({
+        where: { id: tokenRecord.userId },
+        data: { password: hashedPassword },
+      }),
+
+      this.database.passwordSetupToken.update({
+        where: { id: tokenRecord.id },
+        data: { used: true },
+      }),
+    ]);
+
+    return { message: 'Password set successfully' };
+  }
 }

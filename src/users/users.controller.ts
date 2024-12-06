@@ -37,6 +37,14 @@ export class UsersController {
     return this.usersService.verifyEmail(token);
   }
 
+  @Post('set-password')
+  public async setPassword(
+    @Body('token') token: string,
+    @Body('password') password: string,
+  ) {
+    return this.usersService.setPassword(token, password);
+  }
+
   @Get('/patients')
   getAllPatient() {
     return this.usersService.findAllPatients();
