@@ -32,6 +32,11 @@ export class UsersController {
     return this.usersService.createAdmin(createAdminDto);
   }
 
+  @Post('verify-email')
+  public async verifyEmail(@Body('token') token: string) {
+    return this.usersService.verifyEmail(token);
+  }
+
   @Get('/patients')
   getAllPatient() {
     return this.usersService.findAllPatients();

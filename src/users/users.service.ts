@@ -168,4 +168,25 @@ export class UsersService {
       PrismaErrorHandler.handle(error);
     }
   }
+
+  public async verifyEmail(token: string) {
+    const tokenRecord = await this.tokenService.validateToken(
+      token,
+      'verification',
+    );
+
+    await this.database.$transaction([
+      this.database.user.update({
+        where: { id: tokenRecord.userId },
+        data: { emailVerified: new Date() },
+      }),
+      this.database.verificationToken.update({
+        where: { id: tokenRecord.id },
+        data: { used: true },
+      }),
+    ]);
+
+    return { message: 'Email verified successfully' };
+  }
+
 }
