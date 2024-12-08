@@ -39,7 +39,7 @@ enum AppointmentStatus {
 }
 
 model User {
-  id            String   @id @default(uuid())
+  id            String   @id @unique @default(uuid())
   firstName     String
   lastName      String
   email         String   @unique
@@ -48,11 +48,14 @@ model User {
   contactNumber String?
   dob           DateTime
 
-  patient      Patient?
-  doctor       Doctor?
-  nurse        Nurse?
-  admin        Admin?
-  receptionist Receptionist?
+  patient             Patient?
+  doctor              Doctor?
+  nurse               Nurse?
+  admin               Admin?
+  receptionist        Receptionist?
+  emailVerified       DateTime?
+  verificationTokens  VerificationToken[]
+  passwordSetupTokens PasswordSetupToken[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -141,8 +144,28 @@ model Receptionist {
   user   User   @relation(fields: [userId], references: [id])
 }
 
+model PasswordSetupToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id])
+  expires   DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model VerificationToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String   @unique
+  expires   DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
 // model Permission {
-//   id       String   @id @default(cuid())
+//   id       String   @id @default(email())
 //   userId   String
 //   user     User     @relation(fields: [userId], references: [id])
 //   actions  String[]

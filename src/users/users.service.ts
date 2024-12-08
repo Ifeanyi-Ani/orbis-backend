@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreatePatientDto } from './dto/create-patient.dto';
 import { DatabaseService } from 'src/database/database.service';
 import { Role } from '@prisma/client';
@@ -6,10 +10,16 @@ import { CreateAdminDto } from './dto/create-admin.dto';
 import * as bcrypt from 'bcrypt';
 import { BaseExceptionFilter } from '@nestjs/core';
 import { PrismaErrorHandler } from 'src/exception/prisma.exception';
+import { TokenService } from 'src/tokens/tokens.service';
+import { MailService } from 'src/mail/mail.service';
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly database: DatabaseService) {}
+  constructor(
+    private readonly database: DatabaseService,
+    private tokenService: TokenService,
+    private mailService: MailService,
+  ) {}
 
   async createAdmin(createAdminDto: CreateAdminDto) {
     try {
@@ -33,7 +43,7 @@ export class UsersService {
       // encrypt password
       const hashedPassword = await bcrypt.hash(password, 12);
 
-      await this.database.$transaction(async (db) => {
+      return await this.database.$transaction(async (db) => {
         const user = await db.user.create({
           data: {
             email,
@@ -72,14 +82,17 @@ export class UsersService {
       const {
         firstName,
         lastName,
-        password,
         email,
         dob,
         contactNumber,
         ...additionalDetails
       } = createPatientDto;
 
-      const hashedPassword = await bcrypt.hash(password, 12);
+      if (!contactNumber) {
+        throw new NotFoundException('contact number is missing');
+      }
+
+      const hashedPassword = await bcrypt.hash(contactNumber, 12);
 
       await this.database.$transaction(async (db) => {
         const user = await db.user.create({
@@ -100,6 +113,19 @@ export class UsersService {
             ...additionalDetails,
           },
         });
+
+        console.log(user.id);
+        console.log(patient);
+
+        const verificationToken =
+          await this.tokenService.createVerificationToken(user?.id);
+        const passwordSetupToken =
+          await this.tokenService.createPasswordSetupToken(user?.id);
+
+        await Promise.all([
+          this.mailService.sendVerificationEmail(user.email, verificationToken),
+          this.mailService.sendSetPasswordEmail(user.email, passwordSetupToken),
+        ]);
 
         user.password = undefined;
 
@@ -141,5 +167,48 @@ export class UsersService {
       }
       PrismaErrorHandler.handle(error);
     }
+  }
+
+  public async verifyEmail(token: string) {
+    const tokenRecord = await this.tokenService.validateToken(
+      token,
+      'verification',
+    );
+
+    await this.database.$transaction([
+      this.database.user.update({
+        where: { id: tokenRecord.userId },
+        data: { emailVerified: new Date() },
+      }),
+      this.database.verificationToken.update({
+        where: { id: tokenRecord.id },
+        data: { used: true },
+      }),
+    ]);
+
+    return { message: 'Email verified successfully' };
+  }
+
+  public async setPassword(token: string, newPassword: string) {
+    const tokenRecord = await this.tokenService.validateToken(
+      token,
+      'passwordSetup',
+    );
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    await this.database.$transaction([
+      this.database.user.update({
+        where: { id: tokenRecord.userId },
+        data: { password: hashedPassword },
+      }),
+
+      this.database.passwordSetupToken.update({
+        where: { id: tokenRecord.id },
+        data: { used: true },
+      }),
+    ]);
+
+    return { message: 'Password set successfully' };
   }
 }
