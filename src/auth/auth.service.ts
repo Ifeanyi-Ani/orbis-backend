@@ -5,12 +5,13 @@ import {
   Res,
   UnauthorizedException,
 } from '@nestjs/common';
+import { BaseExceptionFilter } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
-import { Prisma, Role } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { Response } from 'express';
 import { DatabaseService } from 'src/database/database.service';
-import { CreateAdminDto } from 'src/users/dto/create-admin.dto';
+import { PrismaErrorHandler } from 'src/exception/prisma.exception';
 
 @Injectable()
 export class AuthService {
@@ -24,42 +25,51 @@ export class AuthService {
   }
 
   async login(email: string, password: string, @Res() res: Response) {
-    if (!email || !password) {
-      throw new BadRequestException('Provide email and password');
+    try {
+      if (!email || !password) {
+        throw new BadRequestException('Provide email and password');
+      }
+
+      const user = await this.DatabaseService.user.findUnique({
+        where: {
+          email,
+        },
+      });
+
+      if (!user) {
+        throw new UnauthorizedException('Invalid credentials');
+      }
+
+      const isPasswordValid = await bcrypt.compare(password, user.password);
+
+      if (!isPasswordValid) {
+        throw new UnauthorizedException('Invalid credentials');
+      }
+
+      const { access_token, refresh_token } = this.generateToken(user);
+
+      res.cookie('access_token', access_token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 30 * 60 * 1000,
+      });
+
+      res.cookie('refresh_token', refresh_token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+      });
+
+      res.status(200).json({ access_token });
+    } catch (error) {
+      if (error instanceof BaseExceptionFilter) {
+        throw error;
+      }
+
+      PrismaErrorHandler.handle(error);
     }
-    const user = await this.DatabaseService.user.findUnique({
-      where: {
-        email,
-      },
-    });
-
-    if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
-    }
-
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-
-    if (!isPasswordValid) {
-      throw new UnauthorizedException('Invalid credentials');
-    }
-
-    const { access_token, refresh_token } = this.generateToken(user);
-
-    res.cookie('access_token', access_token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 30 * 60 * 1000,
-    });
-
-    res.cookie('refresh_token', refresh_token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
-
-    res.status(200).json({ access_token });
   }
 
   private generateToken(user: Prisma.UserCreateInput) {
@@ -83,6 +93,7 @@ export class AuthService {
       }),
     };
   }
+
   refreshToken(user: any, @Res() res: Response) {
     const payload = {
       sub: user.id,
